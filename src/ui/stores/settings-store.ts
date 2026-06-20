@@ -11,6 +11,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import type { WorldBook } from '@engine/types'
+import { loadBuiltInWorldBooks } from '@engine/builtin-worldbooks'
 
 // ===== 类型 =====
 
@@ -64,6 +65,7 @@ function getDefaults(): Record<string, any> {
     worldBooks: [] as WorldBook[],
     activeWorldBookId: null as string | null,
     worldBookDirty: false,
+    disableWorldBookProtection: false,  // 取消内置书只读保护
 
     // 剧情系统
     plotMode: 'off' as string,
@@ -94,6 +96,27 @@ export const useSettingsStore = defineStore('settings', () => {
   // 合并：已存值覆盖默认值（支持未来新增字段自动补默认值）
   const defaults = getDefaults()
   const merged = { ...defaults, ...saved }
+
+  // Phase 8: 启动时异步加载内置世界书（运行时 fetch，始终最新）
+  setTimeout(async () => {
+    try {
+      const builtIn = await loadBuiltInWorldBooks()
+      const existing = (settings.value.worldBooks as WorldBook[]) || []
+      const existingIds = new Set(existing.map(b => b.id))
+      for (const book of builtIn) {
+        if (!existingIds.has(book.id)) {
+          existing.push(book)
+        } else {
+          // 更新内置书条目（用户可能通过开关修改了 enabled/constant）
+          const idx = existing.findIndex(b => b.id === book.id)
+          if (idx >= 0) existing[idx] = book
+        }
+      }
+      settings.value.worldBooks = [...existing]
+    } catch {
+      // fetch 不可用时静默跳过
+    }
+  }, 0)
 
   const settings = ref<Record<string, any>>(merged)
 

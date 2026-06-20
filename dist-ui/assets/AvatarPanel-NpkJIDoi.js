@@ -1,2 +1,0 @@
-import{d as c,b as s,c as e,n as r,t as i,s as l}from"./index-BLVvtrBX.js";const o=["src","alt"],m={key:1,class:"avatar-text"},d=c({__name:"AvatarPanel",props:{src:{},name:{},size:{}},setup(a){function n(t){return t.slice(0,2)}return(t,v)=>(s(),e("div",{class:r(["avatar",[`avatar-${a.size||"md"}`]])},[a.src?(s(),e("img",{key:0,src:a.src,alt:a.name,class:"avatar-img"},null,8,o)):(s(),e("span",m,i(n(a.name)),1))],2))}}),_=l(d,[["__scopeId","data-v-be8beac0"]]);export{_ as A};
-//# sourceMappingURL=AvatarPanel-NpkJIDoi.js.map

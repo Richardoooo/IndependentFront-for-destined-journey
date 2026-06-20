@@ -6,10 +6,11 @@
         <span>返回列表</span>
       </button>
       <h3>{{ book.name }} · 条目管理</h3>
-      <button class="add-btn" @click="addEntry">
+      <button v-if="!readonly" class="add-btn" @click="addEntry">
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
         <span>新建条目</span>
       </button>
+      <span v-else class="builtin-notice"><i class="fa-solid fa-lock" aria-hidden="true"></i> 内置世界书 · 只读</span>
     </div>
 
     <!-- 空状态 -->
@@ -40,23 +41,23 @@
         @keydown.enter="editEntry(idx)"
       >
         <span class="col-num">{{ idx + 1 }}</span>
-        <span class="col-name" @click="togglePreview(idx)" :title="entry.content.slice(0, 100)" role="button" tabindex="0">
+        <span class="col-name" :title="entry.name" role="button" tabindex="0">
           {{ entry.name || '(未命名)' }}
         </span>
         <label class="col-toggle toggle-label-inline" :title="entry.enabled ? '已启用' : '已禁用'">
-          <input type="checkbox" v-model="entry.enabled" @change="markDirty" :aria-label="`启用 ${entry.name}`" />
+          <input type="checkbox" v-model="entry.enabled" @change="onToggleChange" :aria-label="`启用 ${entry.name}`" />
           <span class="toggle-slider-sm"></span>
         </label>
         <label class="col-toggle toggle-label-inline" :title="entry.constant ? '永久注入中' : '关键词触发'">
-          <input type="checkbox" v-model="entry.constant" @change="markDirty" :aria-label="`${entry.name} 永久注入`" />
+          <input type="checkbox" v-model="entry.constant" @change="onToggleChange" :aria-label="`${entry.name} 永久注入`" />
           <span class="toggle-slider-sm"></span>
         </label>
         <span class="col-order">
-          <button class="order-btn" @click="moveUp(idx)" :disabled="idx === 0" aria-label="上移">
+          <button class="order-btn" @click="moveUp(idx)" :disabled="readonly || idx === 0" aria-label="上移">
             <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
           </button>
-          <input type="number" v-model.number="entry.order" @change="markDirty" class="order-input" :aria-label="`${entry.name} 排序`" />
-          <button class="order-btn" @click="moveDown(idx)" :disabled="idx === sortedEntries.length - 1" aria-label="下移">
+          <input type="number" v-model.number="entry.order" :disabled="readonly" @change="markDirty" class="order-input" :aria-label="`${entry.name} 排序`" />
+          <button class="order-btn" @click="moveDown(idx)" :disabled="readonly || idx === sortedEntries.length - 1" aria-label="下移">
             <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
           </button>
         </span>
@@ -64,41 +65,30 @@
           <button class="icon-btn" @click="editEntry(idx)" :aria-label="`编辑 ${entry.name}`">
             <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
           </button>
-          <button class="icon-btn danger" @click="deleteEntry(idx)" :aria-label="`删除 ${entry.name}`">
+          <button v-if="!readonly" class="icon-btn danger" @click="deleteEntry(idx)" :aria-label="`删除 ${entry.name}`">
             <i class="fa-solid fa-trash" aria-hidden="true"></i>
           </button>
         </span>
-      </div>
-
-      <!-- 展开的预览 -->
-      <div v-if="previewIndex !== null" class="entry-preview">
-        <div class="preview-header">
-          <strong>{{ sortedEntries[previewIndex]?.name }}</strong>
-          <button class="icon-btn" @click="previewIndex = null" aria-label="关闭预览">
-            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-          </button>
-        </div>
-        <pre class="preview-content">{{ sortedEntries[previewIndex]?.content || '(空)' }}</pre>
       </div>
     </div>
 
     <!-- 条目编辑弹窗 -->
     <div v-if="editingIndex !== null" class="modal-overlay" @click.self="cancelEdit" @keydown.escape="cancelEdit">
       <div class="edit-modal" role="dialog" aria-modal="true" aria-label="编辑条目">
-        <h4>编辑条目</h4>
+        <h4>{{ readonly ? '查看条目' : '编辑条目' }}</h4>
 
         <label class="form-label" for="edit-name">名称</label>
-        <input id="edit-name" ref="editNameInput" v-model="editForm.name" class="form-input" placeholder="条目名称" />
+        <input id="edit-name" ref="editNameInput" v-model="editForm.name" class="form-input" placeholder="条目名称" :disabled="readonly" :readonly="readonly" />
 
         <label class="form-label" for="edit-keys">关键词（逗号分隔）</label>
-        <input id="edit-keys" v-model="editForm.keys" class="form-input" placeholder="阿斯塔利亚, 虚海" />
+        <input id="edit-keys" v-model="editForm.keys" class="form-input" placeholder="阿斯塔利亚, 虚海" :disabled="readonly" :readonly="readonly" />
 
         <label class="form-label" for="edit-keysecondary">辅助关键词</label>
-        <input id="edit-keysecondary" v-model="editForm.keysecondary" class="form-input" placeholder="世界设定" />
+        <input id="edit-keysecondary" v-model="editForm.keysecondary" class="form-input" placeholder="世界设定" :disabled="readonly" :readonly="readonly" />
 
         <div class="edit-row">
           <label class="form-label">逻辑
-            <select v-model.number="editForm.selectiveLogic" class="form-input" aria-label="关键词匹配逻辑">
+            <select v-model.number="editForm.selectiveLogic" class="form-input" aria-label="关键词匹配逻辑" :disabled="readonly">
               <option :value="0">AND_ANY — 命中任一辅助关键词</option>
               <option :value="1">NOT_ALL — 未命中所有辅助关键词</option>
               <option :value="2">NOT_ANY — 未命中任何辅助关键词</option>
@@ -107,21 +97,21 @@
           </label>
 
           <label class="form-label checkbox-label">
-            <input type="checkbox" v-model="editForm.constant" />
+            <input type="checkbox" v-model="editForm.constant" :disabled="readonly" />
             <span>永久注入</span>
           </label>
 
           <label class="form-label" for="edit-order">排序
-            <input id="edit-order" type="number" v-model.number="editForm.order" class="form-input order-input-sm" />
+            <input id="edit-order" type="number" v-model.number="editForm.order" class="form-input order-input-sm" :disabled="readonly" :readonly="readonly" />
           </label>
         </div>
 
         <label class="form-label" for="edit-content">内容 (Markdown)</label>
-        <textarea id="edit-content" v-model="editForm.content" class="form-textarea" rows="12"></textarea>
+        <textarea id="edit-content" v-model="editForm.content" class="form-textarea" rows="12" :disabled="readonly" :readonly="readonly"></textarea>
 
         <div class="modal-actions">
-          <button class="btn-secondary" @click="cancelEdit">取消</button>
-          <button class="btn-primary" @click="saveEdit">保存</button>
+          <button class="btn-secondary" @click="cancelEdit">{{ readonly ? '关闭' : '取消' }}</button>
+          <button v-if="!readonly" class="btn-primary" @click="saveEdit">保存</button>
         </div>
       </div>
     </div>
@@ -136,6 +126,7 @@ const editNameInput = ref<HTMLInputElement | null>(null)
 
 const props = defineProps<{
   book: WorldBook
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -160,8 +151,6 @@ const editForm = ref({
   content: '',
 })
 
-const previewIndex = ref<number | null>(null)
-
 // ===== Computed =====
 
 const sortedEntries = computed(() => {
@@ -172,6 +161,23 @@ const sortedEntries = computed(() => {
 
 function markDirty() {
   // automatic save via watch
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+function onToggleChange() {
+  if (!props.book.builtIn) return
+
+  // 内置书：直接写回本地 JSON 文件
+  const updatedBook = { ...props.book, entries: entries.value }
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    fetch(`/api/worldbooks/${props.book.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedBook),
+    }).catch(() => {})
+  }, 600)
 }
 
 function addEntry() {
@@ -256,10 +262,6 @@ function moveDown(idx: number) {
   a.order = b.order
   b.order = tmp
   saveBook()
-}
-
-function togglePreview(idx: number) {
-  previewIndex.value = previewIndex.value === idx ? null : idx
 }
 
 function saveBook() {
@@ -582,33 +584,6 @@ watch(() => props.book, (newBook) => {
   color: #ef4444;
 }
 
-/* ===== Preview ===== */
-.entry-preview {
-  padding: 16px;
-  border-top: 1px solid rgba(255,255,255,0.18);
-  background: rgba(128,128,128,0.06);
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.preview-content {
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 300px;
-  overflow-y: auto;
-  margin: 0;
-  font-family: inherit;
-  color: var(--theme-text);
-}
-
 /* ===== Edit Modal ===== */
 .modal-overlay {
   position: fixed;
@@ -785,6 +760,19 @@ watch(() => props.book, (newBook) => {
 
 .btn-secondary:hover {
   background: rgba(255,255,255,0.1);
+}
+
+/* ===== 内置只读 ===== */
+.builtin-notice {
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+input:disabled, .order-btn:disabled, .icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ===== Focus visible ===== */

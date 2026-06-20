@@ -566,6 +566,7 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
           <WorldBookEditor
             v-if="activeWorldBook"
             :book="activeWorldBook"
+            :readonly="(activeWorldBook.builtIn && !s.disableWorldBookProtection) || false"
             @back="closeWorldBookEditor"
             @update="handleWorldBookUpdate"
           />
@@ -574,7 +575,12 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
           <template v-else>
             <div class="section-head">
               <div><h3>世界书管理</h3><p class="section-desc">管理世界书条目，为 Agent 提供世界观上下文。</p></div>
-              <div style="display:flex;gap:8px">
+              <div style="display:flex;gap:8px;align-items:center">
+                <label class="toggle-label" style="margin-right:8px" title="关闭后内置世界书恢复只读保护">
+                  <span class="text-xs text-muted">编辑保护</span>
+                  <input type="checkbox" class="toggle-input" v-model="s.disableWorldBookProtection" />
+                  <span class="toggle-slider"></span>
+                </label>
                 <AppButton variant="secondary" size="sm" @click="importWorldBook">导入ST世界书</AppButton>
                 <AppButton variant="primary" size="sm" @click="newWorldBook">+ 新建世界书</AppButton>
               </div>
@@ -590,16 +596,20 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
             <div v-else class="worldbook-list">
               <AppCard v-for="book in s.worldBooks" :key="book.id" padding="md" class="worldbook-card">
                 <div class="wb-info">
-                  <h4><i class="fa-solid fa-book" aria-hidden="true" style="margin-right:6px;opacity:0.6"></i>{{ book.name }}</h4>
+                  <h4>
+                    <i class="fa-solid fa-book" aria-hidden="true" style="margin-right:6px;opacity:0.6"></i>{{ book.name }}
+                    <span v-if="book.builtIn" class="builtin-badge">内置</span>
+                  </h4>
                   <p class="text-sm text-muted">{{ book.description || book.partition }}</p>
                   <span class="text-sm text-muted">{{ book.entries?.length || 0 }} 条目</span>
                 </div>
                 <div style="display:flex;gap:8px">
-                  <AppButton variant="danger" size="sm" @click="deleteWorldBook(book.id)">
+                  <AppButton v-if="!book.builtIn" variant="danger" size="sm" @click="deleteWorldBook(book.id)">
                     <i class="fa-solid fa-trash" aria-hidden="true"></i>
                   </AppButton>
                   <AppButton variant="secondary" size="sm" @click="activeWorldBook = book">
-                    编辑 <i class="fa-solid fa-arrow-right" aria-hidden="true" style="margin-left:4px"></i>
+                    <i class="fa-solid fa-eye" v-if="book.builtIn" aria-hidden="true" style="margin-right:4px"></i>
+                    浏览 <i class="fa-solid fa-arrow-right" aria-hidden="true" style="margin-left:4px"></i>
                   </AppButton>
                 </div>
               </AppCard>
@@ -843,7 +853,8 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
 .worldbook-card{display:flex;align-items:center;justify-content:space-between;gap:16px;transition:background 0.15s}
 .worldbook-card:hover{background:var(--theme-hover,rgba(255,255,255,0.02))}
 .wb-info{flex:1;min-width:0}
-.wb-info h4{font-size:15px;margin:0 0 4px}
+.wb-info h4{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.builtin-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3)}
 
 /* Toggle */
 .toggle-label{display:flex;align-items:center;gap:10px;cursor:pointer}

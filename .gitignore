@@ -3,11 +3,13 @@ node_modules/
 
 # 编译输出
 dist/
+dist-ui/
 
 # Claude Code 本地配置 / 外部 skill
 .claude/settings.local.json
 .claude/skills/
 .claude/scheduled_tasks.json
+.claude/plans/
 
 # 系统文件
 .DS_Store
@@ -23,5 +25,8 @@ Thumbs.db
 .env
 .env.local
 
-# 大型二进制角色卡图片
-*.png
+# 世界书临时/中间文件
+data/worldbooks/_batch_*.json
+data/worldbooks/_batch_*.txt
+data/worldbooks/_mapping_*
+data/worldbooks/_classification_guide.md

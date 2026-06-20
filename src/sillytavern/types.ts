@@ -15,8 +15,12 @@ export type WorldBookPartition =
   | 'world_overview'     // 世界总览 → story, plot_pre/post
   | 'numerical_design'   // 数值化设计 → vars_update, craft_gen
   | 'character_detail'   // 角色详细 → char_update, char_gen, item_gen
+  | 'race_detail'        // 种族详细 → char_update, char_gen
   | 'region_detail'      // 地区详细 → story, plot_pre/post
   | 'var_update'         // 变量更新规则 → vars_update
+  | 'fated_core'         // 命定核心 → story
+  | 'narrative_guide'    // 叙事指导 → story
+  | 'event_detail'       // 事件相关 → plot_pre/post
   | 'ejs_deferred';      // EJS 延后处理
 
 export interface WorldBookEntry {
@@ -38,6 +42,7 @@ export interface WorldBook {
   partition: WorldBookPartition;
   description?: string;
   entries: WorldBookEntry[];
+  builtIn?: boolean;  // Phase 8: 项目内置世界书，禁止删除
 }
 
 // ========== World Book (Lorebook) Types (v3, deprecated) ==========
