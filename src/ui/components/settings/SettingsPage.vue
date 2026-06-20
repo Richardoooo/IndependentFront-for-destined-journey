@@ -6,6 +6,8 @@ import { useSettingsStore, type ApiEntry, type PresetItem } from '../../stores/s
 import AppButton from '../shared/AppButton.vue'
 import AppCard from '../shared/AppCard.vue'
 import AppModal from '../shared/AppModal.vue'
+import WorldBookEditor from './WorldBookEditor.vue'
+import type { WorldBook } from '@engine/types'
 import { VERSION } from '@engine/index'
 
 const theme = useThemeStore()
@@ -66,6 +68,9 @@ const agentList = [
   { id:'plot_outline', name:'大纲生成', desc:'主线/支线模式下生成剧情大纲和事件树', stage:5 },
 ]
 const activeAgent = ref<string | null>(s.activeAgent)
+
+// Phase 8: 世界书编辑
+const activeWorldBook = ref<WorldBook | null>(null)
 
 // Agent 配置全部从 settings-store 读写，自动持久化
 const agentPromptDraft = ref('')
@@ -226,6 +231,87 @@ function resetPrompt() { if(!activeAgent.value)return; agentPromptDraft.value=''
 function saveAgentSettings() { if(!activeAgent.value)return; s.agentDirty[activeAgent.value]=true; ui.toast('Agent 设置已保存','success') }
 function restoreAgentDefaults() { if(!activeAgent.value)return; s.agentModels[activeAgent.value]=''; s.agentWorldbookEnabled[activeAgent.value]=false; s.agentWorldbookIds[activeAgent.value]=[]; s.agentPrompts[activeAgent.value]=''; s.agentDirty[activeAgent.value]=false; ui.toast('已恢复默认设置','info') }
 
+// Phase 8: 世界书管理
+async function importWorldBook() {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = '.json'
+  input.onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0]
+    if (!f) return
+    try {
+      const raw = JSON.parse(await f.text())
+      const book: WorldBook = {
+        id: f.name.replace(/\.json$/i, ''),
+        name: raw.name || f.name.replace(/\.json$/i, ''),
+        partition: 'world_overview',
+        description: raw.description || '',
+        entries: Array.isArray(raw.entries) ? raw.entries.map((e: any) => ({
+          uid: e.uid || Date.now(),
+          name: e.name || e.comment || '',
+          content: e.content || '',
+          enabled: e.enabled !== false,
+          constant: e.constant || false,
+          key: e.key || [],
+          keysecondary: e.keysecondary || [],
+          selectiveLogic: e.selectiveLogic ?? 0,
+          order: e.order ?? 100,
+          position: e.position ?? 0,
+        })) : [],
+      }
+      s.worldBooks.push(book)
+      ui.toast(`已导入 "${book.name}" (${book.entries.length} 条目)`, 'success')
+    } catch { ui.toast('导入失败：文件格式错误', 'error') }
+  }
+  input.click()
+}
+
+function newWorldBook() {
+  const name = prompt('世界书名称：')
+  if (!name) return
+  const id = name.toLowerCase().replace(/\s+/g, '_')
+  const book: WorldBook = {
+    id,
+    name,
+    partition: 'world_overview',
+    entries: [],
+  }
+  s.worldBooks.push(book)
+  activeWorldBook.value = book
+  ui.toast(`已创建 "${name}"`, 'success')
+}
+
+function deleteWorldBook(id: string) {
+  const book = s.worldBooks.find(b => b.id === id)
+  if (!book) return
+  if (!confirm(`确定删除世界书"${book.name}"吗？将删除全部 ${book.entries?.length || 0} 条条目，此操作不可撤销。`)) return
+  s.worldBooks = s.worldBooks.filter(b => b.id !== id)
+  ui.toast(`已删除"${book.name}"`, 'warning')
+}
+
+function closeWorldBookEditor() {
+  activeWorldBook.value = null
+}
+
+function handleWorldBookUpdate(updated: WorldBook) {
+  const idx = s.worldBooks.findIndex(b => b.id === updated.id)
+  if (idx >= 0) {
+    s.worldBooks[idx] = updated
+  }
+  ui.toast('世界书已保存', 'success')
+}
+
+function toggleAgentWorldBook(agentId: string | null, bookId: string) {
+  if (!agentId) return
+  const ids = s.agentWorldbookIds[agentId] || []
+  const idx = ids.indexOf(bookId)
+  if (idx >= 0) {
+    ids.splice(idx, 1)
+  } else {
+    ids.push(bookId)
+  }
+  s.agentWorldbookIds[agentId] = [...ids]
+  s.agentDirty[agentId] = true
+}
+
 // ============================================================
 // 剧情系统（存于 settings-store，自动持久化）
 // ============================================================
@@ -331,10 +417,10 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
             </div>
           </AppCard>
 
-          <!-- 世界书配置 -->
+          <!-- 世界书配置 (Phase 8) -->
           <AppCard padding="md" class="detail-card">
             <h4>世界书配置</h4>
-            <p class="form-hint">启用该 Agent 的世界书上下文注入。选择要关联的世界书条目。</p>
+            <p class="form-hint">启用该 Agent 的世界书上下文注入。选择要关联的世界书。</p>
             <div class="key-row" style="margin-bottom:8px">
               <label class="toggle-label">
                 <span class="text-sm text-secondary">启用世界书</span>
@@ -345,7 +431,18 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
               </label>
             </div>
             <div class="worldbook-select-list">
-              <p class="text-muted text-sm" style="padding:20px;text-align:center">暂未导入世界书条目。请先在「世界书」导航中导入。</p>
+              <template v-if="s.worldBooks.length === 0">
+                <p class="text-muted text-sm" style="padding:20px;text-align:center">暂未导入世界书。请先在「世界书」导航中导入。</p>
+              </template>
+              <label v-for="book in s.worldBooks" :key="book.id" class="worldbook-checkbox">
+                <input type="checkbox"
+                  :checked="(s.agentWorldbookIds[activeAgent] || []).includes(book.id)"
+                  @change="toggleAgentWorldBook(activeAgent, book.id)"
+                  :aria-label="`关联世界书: ${book.name}`" />
+                <i class="fa-solid fa-book" aria-hidden="true" style="font-size:13px;opacity:0.5"></i>
+                <span class="wb-check-label">{{ book.name }}</span>
+                <span class="text-xs text-muted">{{ book.entries?.length || 0 }} 条目</span>
+              </label>
             </div>
           </AppCard>
 
@@ -463,21 +560,51 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
           </div>
         </section>
 
-        <!-- ========== 世界书 ========== -->
+        <!-- ========== 世界书 (Phase 8) ========== -->
         <section v-if="activeSection === 'worldbook'" class="section centered">
-          <div class="section-head">
-            <div><h3>世界书管理</h3><p class="section-desc">管理世界书条目，为 Agent 提供世界观上下文。此功能后续完善。</p></div>
-            <div style="display:flex;gap:8px">
-              <AppButton variant="secondary" size="sm">导入世界书</AppButton>
-              <AppButton variant="primary" size="sm">+ 新建世界书</AppButton>
+          <!-- 编辑模式：显示条目编辑器 -->
+          <WorldBookEditor
+            v-if="activeWorldBook"
+            :book="activeWorldBook"
+            @back="closeWorldBookEditor"
+            @update="handleWorldBookUpdate"
+          />
+
+          <!-- 列表模式 -->
+          <template v-else>
+            <div class="section-head">
+              <div><h3>世界书管理</h3><p class="section-desc">管理世界书条目，为 Agent 提供世界观上下文。</p></div>
+              <div style="display:flex;gap:8px">
+                <AppButton variant="secondary" size="sm" @click="importWorldBook">导入ST世界书</AppButton>
+                <AppButton variant="primary" size="sm" @click="newWorldBook">+ 新建世界书</AppButton>
+              </div>
             </div>
-          </div>
-          <AppCard padding="md">
-            <p class="text-muted text-sm" style="text-align:center;padding:40px 0">
-              暂无世界书条目<br/>
-              <span style="font-size:0.75rem">点击右上角"导入世界书"或"新建世界书"开始</span>
-            </p>
-          </AppCard>
+
+            <AppCard v-if="s.worldBooks.length === 0" padding="md">
+              <p class="text-muted text-sm" style="text-align:center;padding:40px 0">
+                暂无世界书<br/>
+                <span style="font-size:0.75rem">点击右上角"导入ST世界书"或"新建世界书"开始</span>
+              </p>
+            </AppCard>
+
+            <div v-else class="worldbook-list">
+              <AppCard v-for="book in s.worldBooks" :key="book.id" padding="md" class="worldbook-card">
+                <div class="wb-info">
+                  <h4><i class="fa-solid fa-book" aria-hidden="true" style="margin-right:6px;opacity:0.6"></i>{{ book.name }}</h4>
+                  <p class="text-sm text-muted">{{ book.description || book.partition }}</p>
+                  <span class="text-sm text-muted">{{ book.entries?.length || 0 }} 条目</span>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <AppButton variant="danger" size="sm" @click="deleteWorldBook(book.id)">
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                  </AppButton>
+                  <AppButton variant="secondary" size="sm" @click="activeWorldBook = book">
+                    编辑 <i class="fa-solid fa-arrow-right" aria-hidden="true" style="margin-left:4px"></i>
+                  </AppButton>
+                </div>
+              </AppCard>
+            </div>
+          </template>
         </section>
 
         <!-- ========== 剧情系统 ========== -->
@@ -707,7 +834,16 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
 .toggle-sm::after{width:12px;height:12px}
 
 .preset-empty{padding:24px;text-align:center}
-.worldbook-select-list{border:1px dashed var(--theme-card-border);border-radius:var(--theme-radius-md);min-height:60px}
+.worldbook-select-list{border:1px solid var(--theme-card-border);border-radius:var(--theme-radius-md);min-height:60px;padding:8px;display:flex;flex-direction:column;gap:2px}
+.worldbook-checkbox{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:6px;cursor:pointer;min-height:44px;transition:background 0.15s}
+.worldbook-checkbox:hover{background:var(--theme-hover,rgba(255,255,255,0.05))}
+.worldbook-checkbox input[type=checkbox]{width:18px;height:18px;cursor:pointer;margin:0;accent-color:var(--theme-color-primary,#15803D)}
+.wb-check-label{flex:1;font-size:14px;font-weight:500}
+.worldbook-list{display:flex;flex-direction:column;gap:8px}
+.worldbook-card{display:flex;align-items:center;justify-content:space-between;gap:16px;transition:background 0.15s}
+.worldbook-card:hover{background:var(--theme-hover,rgba(255,255,255,0.02))}
+.wb-info{flex:1;min-width:0}
+.wb-info h4{font-size:15px;margin:0 0 4px}
 
 /* Toggle */
 .toggle-label{display:flex;align-items:center;gap:10px;cursor:pointer}

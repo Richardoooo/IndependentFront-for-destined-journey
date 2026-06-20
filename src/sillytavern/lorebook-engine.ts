@@ -1,5 +1,9 @@
 /**
  * Lorebook Matching Engine
+ *
+ * @deprecated Phase 8: 用 worldbook-loader.ts 替代。
+ * 关键词匹配逻辑已迁移到 worldbook-loader.matchKeyword()。
+ * 本模块仅保留供 v3 prompt-assembler.ts 兼容使用，后续版本移除。
  */
 
 import type { Lorebook, LorebookEntry, MatchedEntry } from './types';

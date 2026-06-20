@@ -50,6 +50,7 @@ function makeContext(overrides: Partial<AgentContext> = {}): AgentContext {
     userInput: 'test input',
     history: [],
     lorebookMatches: [],
+    worldBooks: [],
     characters: [],
     variables: {},
     plotEvents: [],

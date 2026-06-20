@@ -57,6 +57,7 @@ function makeAgentConfig(overrides: Partial<AgentConfig> = {}): AgentConfig {
     timeout: 30000,
     userId: 'fp|test|story',
     promptTemplate: { fixedSystem: '', fixedExamples: '' },
+    worldBookIds: [],
     ...overrides,
   };
 }
@@ -66,6 +67,7 @@ function makeContext(overrides: Partial<AgentContext> = {}): AgentContext {
     userInput: '测试输入',
     history: [],
     lorebookMatches: [],
+    worldBooks: [],
     characters: [],
     variables: {},
     plotEvents: [],

@@ -10,6 +10,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import type { WorldBook } from '@engine/types'
 
 // ===== 类型 =====
 
@@ -58,6 +59,11 @@ function getDefaults(): Record<string, any> {
     // 预设系统 (ChatPreset)
     presets: [] as PresetItem[],
     activePresetId: '',
+
+    // Phase 8: 世界书管理
+    worldBooks: [] as WorldBook[],
+    activeWorldBookId: null as string | null,
+    worldBookDirty: false,
 
     // 剧情系统
     plotMode: 'off' as string,

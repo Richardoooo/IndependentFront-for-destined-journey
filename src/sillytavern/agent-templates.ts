@@ -16,7 +16,9 @@
  *   const userMessage = tpl.variableInstruction(ctx);
  */
 
-import type { AgentPromptTemplate, AgentContext } from './types';
+import type { AgentPromptTemplate, AgentContext, AgentConfig, AgentPreset, WorldBook } from './types';
+import { getEntriesForAgent, filterActiveEntries, formatWorldBookEntries } from './worldbook-loader';
+import { buildPresetSection, getPreset } from './preset-loader';
 
 // ========== 通用工具 ==========
 
@@ -666,28 +668,69 @@ export function getAgentTemplate(agentId: string): AgentPromptTemplate | undefin
 }
 
 /**
- * 为指定 Agent 构建完整的 messages 数组
- * system 消息 = fixedSystem + fixedExamples + variableContext
- * user 消息 = variableInstruction
+ * 为指定 Agent 构建完整的 messages 数组 (Phase 8: 四部分拼接)
+ *
+ * 四部分 Prompt 结构:
+ *   1. 预设 (Preset) — fixedSystem + fixedExamples，per-agent 固定
+ *   2. 世界书 (World Books) — constant + keyword 过滤后的世界书条目
+ *   3. 变量区 (Variable Zone) — 每轮变化的动态上下文
+ *   4. 正文/用户输入 (Body) — 对话历史 + 本轮用户输入
+ *
+ * system 消息 = 预设 + 世界书 + 变量区
+ * user 消息 = 正文/用户输入
  */
 export function buildAgentMessages(
   agentId: string,
   ctx: AgentContext,
+  configs?: AgentConfig[],
+  worldBooks?: WorldBook[],
+  presets?: AgentPreset[],
 ): Array<{ role: string; content: string }> | null {
   const tpl = getAgentTemplate(agentId);
   if (!tpl) return null;
 
-  const systemContent = [
-    tpl.fixedSystem,
-    tpl.fixedExamples,
-    tpl.variableContext(ctx),
-  ].filter(Boolean).join('\n\n');
+  // Part 1: 预设 (固定部分)
+  let presetSection = '';
+  if (presets && configs) {
+    const config = configs.find(c => c.agentId === agentId);
+    if (config?.presetId) {
+      const preset = getPreset(config.presetId, presets);
+      if (preset) {
+        presetSection = buildPresetSection(preset);
+      }
+    }
+  }
+  // 无预设时回退到旧的 fixedSystem + fixedExamples（保持兼容）
+  if (!presetSection) {
+    presetSection = [tpl.fixedSystem, tpl.fixedExamples].filter(Boolean).join('\n\n');
+  }
 
-  const userContent = tpl.variableInstruction(ctx);
+  // Part 2: 世界书
+  let worldBookSection = '';
+  if (configs && worldBooks) {
+    const entries = getEntriesForAgent(agentId, configs, worldBooks);
+    const activeEntries = filterActiveEntries(
+      entries,
+      ctx.userInput + '\n' + (ctx.history.slice(-5).map(m => m.content).join('\n')),
+    );
+    worldBookSection = formatWorldBookEntries(activeEntries);
+  }
+
+  // Part 3: 变量区 (动态上下文)
+  const variableSection = tpl.variableContext(ctx);
+
+  // Part 4: 正文/用户输入
+  const bodySection = tpl.variableInstruction(ctx);
+
+  const systemContent = [
+    presetSection,
+    worldBookSection,
+    variableSection,
+  ].filter(Boolean).join('\n\n');
 
   return [
     { role: 'system', content: systemContent },
-    { role: 'user', content: userContent },
+    { role: 'user', content: bodySection },
   ];
 }
 

@@ -6,8 +6,44 @@
 
 import type { GameTime } from './time-system';
 
-// ========== World Book (Lorebook) Types ==========
+// ========== World Book (Lorebook) Types (v3, deprecated) ==========
+// Phase 8 用新 WorldBook 类型替代，旧 Lorebook/LorebookEntry 保留兼容导入
 
+// ========== World Book Types (Phase 8) ==========
+
+export type WorldBookPartition =
+  | 'world_overview'     // 世界总览 → story, plot_pre/post
+  | 'numerical_design'   // 数值化设计 → vars_update, craft_gen
+  | 'character_detail'   // 角色详细 → char_update, char_gen, item_gen
+  | 'region_detail'      // 地区详细 → story, plot_pre/post
+  | 'var_update'         // 变量更新规则 → vars_update
+  | 'ejs_deferred';      // EJS 延后处理
+
+export interface WorldBookEntry {
+  uid: number;                        // 唯一标识（来自原版世界书 UID）
+  name: string;                       // 条目名称（对应 ST 的 comment）
+  content: string;                    // 注入正文
+  enabled: boolean;                   // 开关
+  constant: boolean;                  // 永久注入（跳过关键词扫描）
+  key: string[];                      // 关键词
+  keysecondary: string[];             // 辅助关键词
+  selectiveLogic: 0 | 1 | 2 | 3;     // AND_ANY / NOT_ALL / NOT_ANY / AND_ALL
+  order: number;                      // 排序（越大越靠后）
+  position: number;                   // 世界书内位置分组（ST 兼容保留）
+}
+
+export interface WorldBook {
+  id: string;
+  name: string;
+  partition: WorldBookPartition;
+  description?: string;
+  entries: WorldBookEntry[];
+}
+
+// ========== World Book (Lorebook) Types (v3, deprecated) ==========
+// Phase 8 已迁移到 WorldBook / WorldBookEntry，以下类型保留供 ST 导入兼容
+
+/** @deprecated Phase 8: 用 WorldBookEntry 替代 */
 export interface LorebookEntry {
   id: string;
   keys: string[];
@@ -51,6 +87,7 @@ export interface LorebookEntry {
   };
 }
 
+/** @deprecated Phase 8: 用 WorldBook 替代 */
 export interface Lorebook {
   id: string;
   name: string;
@@ -182,6 +219,23 @@ export interface AgentConfig {
     fixedSystem: string;        // 前固定部分（缓存命中关键）
     fixedExamples: string;      // Few-shot 示例
   };
+  worldBookIds: string[];       // Phase 8: 该 Agent 挂载的世界书 ID 列表
+  presetId?: string;            // Phase 8: 该 Agent 使用的预设 ID
+}
+
+// ========== Preset (Phase 8) ==========
+
+/** Agent 预设 — 每个 Agent 的固定提示词（职责/思维链/格式） */
+export interface AgentPreset {
+  id: string;
+  name: string;
+  fixedSystem: string;            // 固定系统提示词（缓存敏感）
+  fixedExamples: string;          // Few-shot 示例
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
 }
 
 /** Agent Prompt 模板（运行时使用） */
@@ -883,7 +937,9 @@ export interface AgentDefinition {
 export interface AgentContext {
   userInput: string;
   history: ChatMessage[];
+  /** @deprecated Phase 8: 用 worldBooks 替代 */
   lorebookMatches: MatchedEntry[];
+  worldBooks: WorldBookEntry[];    // Phase 8: 本 Agent 可见的世界书条目
   characters: CharacterState[];
   variables: Record<string, any>;
   plotEvents: PlotEvent[];

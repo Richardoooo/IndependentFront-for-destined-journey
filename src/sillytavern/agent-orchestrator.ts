@@ -21,12 +21,18 @@ import { scanMarkers } from './marker-protocol';
 
 // ========== Types ==========
 
+import type { AgentPreset, WorldBook } from './types';
+
 export interface OrchestratorOptions {
   pipeline: Pipeline;
   context: AgentContext;
   agentConfigs: AgentConfig[];
   endpoints: ApiEndpoint[];
   saveId: string;
+  /** Phase 8: 预加载的世界书 */
+  worldBooks?: WorldBook[];
+  /** Phase 8: 预加载的预设列表 */
+  presets?: AgentPreset[];
   /** 可选的外部 fetch，用于测试注入 */
   fetch?: typeof fetch;
   /** 手动指定要运行的 Agent（空 = 全部） */
@@ -80,6 +86,10 @@ export class AgentOrchestrator {
   private status: 'idle' | 'running' | 'completed' | 'failed' = 'idle';
   private runId: string;
 
+  /** Phase 8: 预加载的世界书和预设 */
+  private worldBooks: WorldBook[];
+  private presets: AgentPreset[];
+
   /** Phase 6e: Stage 1 检测到的 combat markers — 延迟到 Stage 2 char_gen 后执行 */
   private pendingCombatMarkers: CombatTriggerMarker[] = [];
 
@@ -88,6 +98,8 @@ export class AgentOrchestrator {
     this.context = options.context;
     this.saveId = options.saveId;
     this.events = events;
+    this.worldBooks = options.worldBooks ?? [];
+    this.presets = options.presets ?? [];
     this.runId = crypto.randomUUID();
 
     // Build lookup maps
@@ -284,8 +296,15 @@ export class AgentOrchestrator {
       };
     }
 
-    // 构建 messages
-    const messages = buildAgentMessages(config.agentId, this.context);
+    // 构建 messages (Phase 8: 四部分拼接)
+    const configsArr = Array.from(this.agentConfigs.values());
+    const messages = buildAgentMessages(
+      config.agentId,
+      this.context,
+      configsArr,
+      this.worldBooks,
+      this.presets,
+    );
     if (!messages) {
       return {
         agentId: config.agentId,
@@ -453,7 +472,7 @@ export class AgentOrchestrator {
           const parsed = JSON.parse(varsOutput.trim());
           if (parsed.delta_time && typeof parsed.delta_time === 'number' && parsed.delta_time > 0) {
             const { createStateManager } = await import('./state-manager');
-            const sm = createStateManager(this.context.saveId);
+            const sm = createStateManager(this.saveId);
             await sm.applyTimeAdvance(parsed.delta_time);
           }
         } catch {
