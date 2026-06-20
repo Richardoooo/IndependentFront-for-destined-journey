@@ -17,6 +17,9 @@ export interface ChatRequest {
   messages: Array<{ role: string; content: string }>;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
   stop?: string[];
 }
 
@@ -108,6 +111,9 @@ export class AgentClient {
           messages: request.messages,
           temperature: request.temperature ?? 0.7,
           max_tokens: request.maxTokens ?? 2048,
+          top_p: request.topP ?? 1.0,
+          frequency_penalty: request.frequencyPenalty ?? 0,
+          presence_penalty: request.presencePenalty ?? 0,
           stream: false,
           stop: request.stop,
           // DeepSeek cache isolation

@@ -217,6 +217,9 @@ export interface AgentConfig {
   model: string;                // 覆盖 endpoint 的默认 model
   temperature: number;
   maxTokens: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
   retryOnFail: boolean;
   timeout: number;
   userId: string;               // DeepSeek 缓存隔离（自动生成）

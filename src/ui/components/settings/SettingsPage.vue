@@ -157,14 +157,39 @@ function openEditPreset(p: PresetItem) {
 async function savePreset() {
   const { savePreset: sp } = await import('@engine/database')
   const now = Date.now()
-  const settings: Record<string, any> = {
-    temp_openai: presetForm.temperature,
-    openai_max_tokens: presetForm.maxTokens,
-    top_p_openai: presetForm.topP,
-    freq_pen_openai: presetForm.freqPen,
-    pres_pen_openai: presetForm.presPen,
-    prompts: [{ name: 'Main Prompt', content: presetForm.mainPrompt, role: 'system' }],
+
+  let settings: Record<string, any>
+  if (editingPresetId.value) {
+    // 编辑已有预设：基于原 settings 更新，不丢失原有数据
+    const original = s.presets.find((p: PresetItem) => p.id === editingPresetId.value)
+    settings = {
+      ...(original?.settings || {}),   // 保留所有原有 ST 配置
+      temp_openai: presetForm.temperature,
+      openai_max_tokens: presetForm.maxTokens,
+      top_p_openai: presetForm.topP,
+      freq_pen_openai: presetForm.freqPen,
+      pres_pen_openai: presetForm.presPen,
+    }
+    // 更新 prompts[0] 的 Main Prompt 内容，保留其余所有条目
+    const prompts = [...(settings.prompts || [])]
+    if (prompts.length > 0) {
+      prompts[0] = { ...prompts[0], content: presetForm.mainPrompt, name: prompts[0].name || 'Main Prompt', role: prompts[0].role || 'system' }
+    } else {
+      prompts.push({ name: 'Main Prompt', content: presetForm.mainPrompt, role: 'system' })
+    }
+    settings.prompts = prompts
+  } else {
+    // 新建预设：从零构建
+    settings = {
+      temp_openai: presetForm.temperature,
+      openai_max_tokens: presetForm.maxTokens,
+      top_p_openai: presetForm.topP,
+      freq_pen_openai: presetForm.freqPen,
+      pres_pen_openai: presetForm.presPen,
+      prompts: [{ name: 'Main Prompt', content: presetForm.mainPrompt, role: 'system' }],
+    }
   }
+
   const item: PresetItem = {
     id: editingPresetId.value || crypto.randomUUID(),
     name: presetForm.name, description: presetForm.description,
@@ -240,6 +265,11 @@ async function saveAsDefault() {
     systemPrompt: '',
     presetId: '',
     preset: null as PresetItem | null,
+    temperature: s.agentTemperature[agentId] ?? 0.7,
+    topP: s.agentTopP[agentId] ?? 1.0,
+    freqPen: s.agentFreqPen[agentId] ?? 0,
+    presPen: s.agentPresPen[agentId] ?? 0,
+    maxTokens: s.agentMaxTokens[agentId] ?? 16384,
   }
 
   if (agentId === 'story') {
@@ -300,6 +330,11 @@ function restoreAgentDefaults() {
       s.agentPrompts[agentId] = pd.systemPrompt || ''
       agentPromptDraft.value = pd.systemPrompt || ''
     }
+    s.agentTemperature[agentId] = pd.temperature ?? 0.7
+    s.agentTopP[agentId] = pd.topP ?? 1.0
+    s.agentFreqPen[agentId] = pd.freqPen ?? 0
+    s.agentPresPen[agentId] = pd.presPen ?? 0
+    s.agentMaxTokens[agentId] = pd.maxTokens ?? 16384
     s.s.agentPromptEdited = false
     s.agentDirty[agentId] = false
     ui.toast('已恢复项目默认设置', 'info')
@@ -313,6 +348,11 @@ function restoreAgentDefaults() {
   s.agentPrompts[agentId] = ''
   s.activePresetId = ''
   agentPromptDraft.value = ''
+  s.agentTemperature[agentId] = 0.7
+  s.agentTopP[agentId] = 1.0
+  s.agentFreqPen[agentId] = 0
+  s.agentPresPen[agentId] = 0
+  s.agentMaxTokens[agentId] = 16384
   s.s.agentPromptEdited = false
   s.agentDirty[agentId] = false
   ui.toast('已恢复默认设置', 'info')
@@ -501,6 +541,49 @@ async function clearAll(){const{deleteDatabase}=await import('@engine/database')
               <span v-if="!s.agentModels[activeAgent] && !hasApi" class="api-warn">⚠ 请先配置 API</span>
               <span v-else-if="!s.agentModels[activeAgent]" class="api-warn">⚠ 未选择</span>
               <span v-else class="api-ok">✓</span>
+            </div>
+          </AppCard>
+
+          <!-- LLM 参数 (所有 Agent 通用) -->
+          <AppCard padding="md" class="detail-card">
+            <h4>LLM 参数</h4>
+            <p class="form-hint">控制此 Agent 的采样行为和生成长度。所有参数均有合理默认值。</p>
+            <div class="form-grid" style="grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px">
+              <label class="form-label">Temperature
+                <p class="form-hint">越高越随机 (0-2)</p>
+                <input type="number" step="0.1" min="0" max="2"
+                  :value="s.agentTemperature[activeAgent] ?? 0.7"
+                  @input="s.agentTemperature[activeAgent] = Number(($event.target as HTMLInputElement).value); s.agentDirty[activeAgent] = true"
+                  class="form-input" />
+              </label>
+              <label class="form-label">Top P
+                <p class="form-hint">核采样阈值 (0-1)</p>
+                <input type="number" step="0.05" min="0" max="1"
+                  :value="s.agentTopP[activeAgent] ?? 1.0"
+                  @input="s.agentTopP[activeAgent] = Number(($event.target as HTMLInputElement).value); s.agentDirty[activeAgent] = true"
+                  class="form-input" />
+              </label>
+              <label class="form-label">Frequency Penalty
+                <p class="form-hint">抑制重复 (-2 ~ 2)</p>
+                <input type="number" step="0.1" min="-2" max="2"
+                  :value="s.agentFreqPen[activeAgent] ?? 0"
+                  @input="s.agentFreqPen[activeAgent] = Number(($event.target as HTMLInputElement).value); s.agentDirty[activeAgent] = true"
+                  class="form-input" />
+              </label>
+              <label class="form-label">Presence Penalty
+                <p class="form-hint">鼓励新话题 (-2 ~ 2)</p>
+                <input type="number" step="0.1" min="-2" max="2"
+                  :value="s.agentPresPen[activeAgent] ?? 0"
+                  @input="s.agentPresPen[activeAgent] = Number(($event.target as HTMLInputElement).value); s.agentDirty[activeAgent] = true"
+                  class="form-input" />
+              </label>
+              <label class="form-label">Max Tokens
+                <p class="form-hint">单次回复最大长度</p>
+                <input type="number" min="100" max="32768" step="100"
+                  :value="s.agentMaxTokens[activeAgent] ?? 16384"
+                  @input="s.agentMaxTokens[activeAgent] = Number(($event.target as HTMLInputElement).value); s.agentDirty[activeAgent] = true"
+                  class="form-input" />
+              </label>
             </div>
           </AppCard>
 

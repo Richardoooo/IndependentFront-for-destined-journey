@@ -335,6 +335,9 @@ export class AgentOrchestrator {
       messages,
       temperature: config.temperature,
       maxTokens: config.maxTokens,
+      topP: config.topP,
+      frequencyPenalty: config.frequencyPenalty,
+      presencePenalty: config.presencePenalty,
     };
 
     return client.chat(request);

@@ -48,6 +48,11 @@ export interface AgentDefaultEntry {
   systemPrompt: string
   presetId: string
   preset: PresetItem | null
+  temperature: number
+  topP: number
+  freqPen: number
+  presPen: number
+  maxTokens: number
 }
 
 export interface AgentProjectDefaults {
@@ -72,6 +77,13 @@ function getDefaults(): Record<string, any> {
     agentPrompts: {} as Record<string, string>,
     agentPromptEdited: false,
     agentDirty: {} as Record<string, boolean>,
+
+    // Agent LLM 参数 (每 Agent 独立)
+    agentTemperature: {} as Record<string, number>,
+    agentTopP: {} as Record<string, number>,
+    agentFreqPen: {} as Record<string, number>,
+    agentPresPen: {} as Record<string, number>,
+    agentMaxTokens: {} as Record<string, number>,
 
     // 预设系统 (ChatPreset)
     presets: [] as PresetItem[],
@@ -187,6 +199,22 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       if (!(agentId in (settings.value.agentPrompts as Record<string, string>))) {
         settings.value.agentPrompts[agentId] = entry.systemPrompt ?? ''
+      }
+      // LLM 参数（缺省使用合理默认值）
+      if (!(agentId in (settings.value.agentTemperature as Record<string, number>))) {
+        settings.value.agentTemperature[agentId] = entry.temperature ?? 0.7
+      }
+      if (!(agentId in (settings.value.agentTopP as Record<string, number>))) {
+        settings.value.agentTopP[agentId] = entry.topP ?? 1.0
+      }
+      if (!(agentId in (settings.value.agentFreqPen as Record<string, number>))) {
+        settings.value.agentFreqPen[agentId] = entry.freqPen ?? 0
+      }
+      if (!(agentId in (settings.value.agentPresPen as Record<string, number>))) {
+        settings.value.agentPresPen[agentId] = entry.presPen ?? 0
+      }
+      if (!(agentId in (settings.value.agentMaxTokens as Record<string, number>))) {
+        settings.value.agentMaxTokens[agentId] = entry.maxTokens ?? 16384
       }
       // 预设：如果项目默认有预设且用户本地没有，插入 presets 数组
       if (entry.preset && entry.presetId) {
