@@ -12,14 +12,17 @@
 
 ```bash
 docs/
+├── fated-poem-engine-prd.md     # 🆕 项目 PRD（产品需求文档，必读）
 ├── ARCHITECTURE.md              # 完整软件+世界观架构
 ├── planning/                    # 会话追踪（task_plan / findings / progress）
 ├── phases/                      # Phase 计划
 │   ├── phase4_plan.md           # Phase 4 记忆系统 & 剧情规划
 │   ├── phase7/                  # Phase 7 前端 UI 总体规格
 │   ├── phase7d/                 # Phase 7d 捏人页架构/现状/差距分析
-│   └── phase7e/                 # Phase 7e 游戏页
-│       └── game_page_design.md  # 游戏页设计规划 + 引擎支撑审计（7e 必读）
+│   ├── phase7e/                 # Phase 7e 游戏页
+│   │   └── game_page_design.md  # 游戏页设计规划 + 引擎支撑审计（7e 必读）
+│   └── phase8/                  # Phase 8 Agent 上下文可见性
+│       └── phase8_plan.md       # Agent 可见性模型 + 世界书分区 + 预设系统
 ├── reference/                   # 参考页面架构分析
 │   ├── status_page_architecture.md  # 状态栏页面架构（7e 必读）
 │   └── effect_script_system.md      # 词条效果 & 脚本系统架构（引擎必读）
